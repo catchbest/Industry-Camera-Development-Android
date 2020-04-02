@@ -1,0 +1,1 @@
+cp * /home/terry/work/20171107_developing/011/git.KSJApiNew/KSJApi/jnilib/jni/../../../../../101//github.KSJApiNew/KSJApi.bin/android/ -rf

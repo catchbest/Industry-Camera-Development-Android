@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.catchebstnew.www.ImageViewActivity">
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        />
+
+    <Button
+        android:id="@+id/btn_back"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="16dp"
+        android:text="返回"/>
+
+    <Button
+        android:id="@+id/btn_catch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="抓图"
+        android:layout_marginLeft="16dp"
+        android:layout_toRightOf="@+id/btn_back"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:id="@+id/tv_fps"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:text="fps:0.0"
+        android:layout_marginRight="20dp"
+        android:layout_marginTop="40dp"
+        android:textSize="18sp"
+        android:textColor="#ff0000"/>
+
+    <TextView
+        android:id="@+id/tv_fail_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toLeftOf="@+id/tv_fps"
+        android:text="采图失败次数：0"
+        android:layout_marginRight="40dp"
+        android:layout_marginTop="40dp"
+        android:textSize="18sp"
+        android:textColor="#ff0000"/>
+
+</RelativeLayout>
