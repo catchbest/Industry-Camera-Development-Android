@@ -1,9 +1,0 @@
-
-Development目录下放置与开发相关的文件。
-
-Development
-    |----Apk: Android的软件包
-    |----Doc: 开发说明文档。
-    |----Librarys: 库文件目录。
-    |----Samples
-                 |----KSJDemoAndriod: Android工程示例
