@@ -85,6 +85,15 @@ public class cam {
 
     public native int AEStart(int index,int nStart, int nMaxCount,int nTarget);
 
+    public native int WrEEPROM(int index, int address, int value);
+    public native int RdEEPROM(int index, int address, int[] value);
+
+    public native int WrEEPROMEx(int index, int address, int value);
+    public native int RdEEPROMEx(int index, int address, int[] value);
+
+    public native int WrEEPROMExEx(int index, int address, int bytes, Object buffer);
+    public native byte[] RdEEPROMExEx(int index, int address, int bytes);
+
     public native int  UnInit();
 
 
