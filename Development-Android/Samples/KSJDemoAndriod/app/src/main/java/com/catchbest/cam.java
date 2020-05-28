@@ -18,6 +18,8 @@ public class cam {
     }
 
 
+    public native int EnableLog(int bEnable);
+
     public native int Init();
 
     public native int CaptureRawData(int index, Object buffer);
