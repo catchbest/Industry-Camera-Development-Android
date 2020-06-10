@@ -24,7 +24,12 @@ import android.widget.Toast;
 import com.catchbest.R;
 import com.catchbest.cam;
 
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -41,6 +46,7 @@ import static com.catchbest.KSJ_WB_MODE.KSJ_SWB_AUTO_ONCE;
 import static com.catchbest.KSJ_SENSITIVITYMODE.KSJ_LOW;
 
 public class ImageViewActivity extends AppCompatActivity implements View.OnClickListener {
+    public static final String TAG = "ImageViewActivity";
     private final int PERMISSION_REQUEST = 0xa00;
     private ImageView imageView;
     private TextView tv_fps;
@@ -50,9 +56,15 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
 
     private cam ksjcam;
     private boolean isStart = false;//相机开启状态
+    private boolean isWorking = false;//相机工作状态
+    private boolean isMonoCamera = true; //是否黑白相机
     private long startTime;
     private double fbs = 0.0;
     private int count = 0;
+    private int imgWidth = 0;
+    private int imgHeight = 0;
+    private int imgBitCount = 0;
+
     private Lock lock;
 
     Handler handler = new Handler() {
@@ -91,6 +103,12 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
         btn_catch.setOnClickListener(this);
 
         lock = new ReentrantLock();
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         init();
     }
 
@@ -99,6 +117,14 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
      */
     private void init() {
         ksjcam = new cam();
+
+        int rr = ksjcam.EnableLog(0);
+
+        String logstr = "EnableLog：" + rr;
+        Log.e("TAG","info:" + logstr);//输出相机信息
+
+        ksjcam.UnInit();
+        upgradeRootPermission("chmod -R 777 /dev/bus/usb/");  //相机重新插拔的话，需要授权
         ksjcam.Init();
         ksjcam.m_devicecount = ksjcam.DeviceGetCount();
 
@@ -122,47 +148,94 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
         int[] deviceTypeArray = new int[ksjcam.m_devicecount];
          int[] serialsArray = new int[ksjcam.m_devicecount];
          int[] firmwareVersionArray = new int[ksjcam.m_devicecount];
-         ksjcam.DeviceGetInformation(0, deviceTypeArray, serialsArray, firmwareVersionArray);
+        int rt = ksjcam.DeviceGetInformation(0, deviceTypeArray, serialsArray, firmwareVersionArray);
 
-         String content = "相机个数：" + ksjcam.m_devicecount + "\n相机型号：" + deviceTypeArray[0] + "\n序列号：" + serialsArray[0] + "\n版本：" + firmwareVersionArray[0];
+//        byte[] byteArrayinfo = new byte[32];
+//        byteArrayinfo = ksjcam.RdEEPROMExEx(0, 261088, 32);
+//        Log.e("TAG", "init: size=" +  ksjcam.RdEEPROMExEx(0, 261088, 32).length );
+//         String content = "相机个数：" + ksjcam.m_devicecount + "\n相机型号：" + deviceTypeArray[0] + "\n序列号：" + serialsArray[0] + "\n版本：" + firmwareVersionArray[0] + "\n SN：" + byteArrayinfo[0] + " " + byteArrayinfo[1] + " " + byteArrayinfo[2] + " " + byteArrayinfo[3] + " " + byteArrayinfo[31];
+//         Log.e("TAG","info:" + content);//输出相机信息
+         String content = "相机个数：" + ksjcam.m_devicecount + "\nRet=:" + rt + "\n相机型号：" + deviceTypeArray[0] + "\n序列号：" + serialsArray[0] + "\n版本：" + firmwareVersionArray[0];
          Log.e("TAG","info:" + content);//输出相机信息
 
+        int[] nxStart = new int[1];
+        int[] nyStart = new int[1];
+        int[] nWidth = new int[1];
+        int[] nHeight = new int[1];
 
-        ksjcam.CaptureSetFieldOfView(0, 0, 0, 728, 544);//设置采集区域
+        //ksjcam.CaptureSetFieldOfView(0, 0, 0, 2592, 1944);//设置采集区域
+        ksjcam.CaptureGetFieldOfView(0, nxStart, nyStart, nWidth, nHeight);
+
+        if (nWidth[0] <= 0 || nHeight[0] <= 0) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("提示");
+            builder.setMessage("相机视场错误设备");
+            builder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    finish();
+                }
+            });
+            AlertDialog dialog = builder.create();
+            dialog.setCanceledOnTouchOutside(false);
+            dialog.show();
+            return;
+        }
+
+        imgWidth = nWidth[0];
+        imgHeight = nHeight[0];
+
         ksjcam.SetTriggerMode(0, KSJ_TRIGGER_INTERNAL.ordinal());//触发模式
         ksjcam.WhiteBalanceSet(0, KSJ_SWB_AUTO_ONCE.ordinal());//白平衡
         ksjcam.ExposureTimeSet(0, 20);//曝光
 //        ksjcam.SensitivitySetMode(0, KSJ_LOW.ordinal());//设置灵敏度
         int isBlackWhite = ksjcam.QueryFunction(0, 0);//判断黑白、彩色相机 返回值1：黑白相机 0：彩色相机
         if (isBlackWhite == 1) {
-            Toast.makeText(this, "黑白相机", Toast.LENGTH_SHORT).show();
-            isStart = true;
-            startTime = System.currentTimeMillis();
-            startImageViewBlackWhite();
+            isMonoCamera = true;
+            imgBitCount = 24;
         }
-        /**
-         else {//也可以用ImageView 成像彩色相机
-         startImageViewColor();
-         }
-         */
+        else {
+            isMonoCamera = false;
+            imgBitCount = 8;
+        }
+
+         isStart = true;
+         startTime = System.currentTimeMillis();
+         startImageView();
     }
 
     /**
      * 黑白相机采图
      */
-    private void startImageViewBlackWhite() {
+    private void startImageView() {
         startTime = System.currentTimeMillis();
         Thread captureThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                while (isStart) {
-                    lock.lock();
-                    int ret = captureAndShow_BlackWhite(0, 728, 544);
-                    if (ret == -1) {
-                        Log.e("TAG", "run: " + "一帧图片没取到");
+                isWorking=true;
+                if(isMonoCamera) {
+                    while (isStart) {
+                        lock.lock();
+                        int ret = captureAndShow_Mono(0, imgWidth, imgHeight);
+                        if (ret == -1) {
+                            upgradeRootPermission("chmod -R 777 /dev/bus/usb/");  //相机重新插拔的话，需要授权
+                            Log.e("TAG", "run: " + "一帧图片没取到");
+                        }
+                        lock.unlock();
                     }
-                    lock.unlock();
                 }
+                else {
+                    while (isStart) {
+                        lock.lock();
+                        int ret = captureAndShow_RGB(0, imgWidth, imgHeight);
+                        if (ret == -1) {
+                            upgradeRootPermission("chmod -R 777 /dev/bus/usb/");  //相机重新插拔的话，需要授权
+                            Log.e("TAG", "run: " + "一帧图片没取到");
+                        }
+                        lock.unlock();
+                    }
+                }
+                isWorking=false;
             }
         });
         captureThread.start();
@@ -202,10 +275,43 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
      * @param height 采图高度
      * @return
      */
-    public int captureAndShow_BlackWhite(final int index, int width, int height) {
+    public int captureAndShow_Mono(final int index, int width, int height) {
         byte[] byteArray = ksjcam.CaptureRAWdataArray(index, width, height);
+
         if (byteArray != null && byteArray.length > 0) {
             Bitmap bitmap = createBitmap_from_byte_alpha_data(width, height, byteArray);
+            Message message = new Message();
+            message.what = 0;
+            message.arg1 = index;
+            message.obj = bitmap;
+            handler.sendMessage(message);
+        } else {
+            failCount++;
+            Log.e("TAG", "采图失败次数: " + failCount);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    tv_failCount.setText("采图失败次数：" + failCount);
+                }
+            });
+            return -1;
+        }
+
+        return 0;
+    }
+
+    /**
+     * 采RGB图
+     *
+     * @param index  相加下标，只有一个相机index=0
+     * @param width  采图宽度
+     * @param height 采图高度
+     * @return
+     */
+    public int captureAndShow_RGB(final int index, int width, int height) {
+        byte[] byteArray = ksjcam.CaptureRGBdataArray(index, width, height);
+        if (byteArray != null && byteArray.length > 0) {
+            Bitmap bitmap = createBitmap_from_rgb_alpha_data(width, height, byteArray);
             Message message = new Message();
             message.what = 0;
             message.arg1 = index;
@@ -237,7 +343,22 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
     public Bitmap createBitmap_from_byte_alpha_data(int width, int height, byte[] buf) {
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         bitmap.setHasAlpha(false);
-        bitmap.setPixels(getIntArray(buf), 0, width, 0, 0, width, height);
+        bitmap.setPixels(getIntArrayMono(buf), 0, width, 0, 0, width, height);
+        return bitmap;
+    }
+
+    /**
+     * 生成bitmap
+     *
+     * @param width  图宽
+     * @param height 图高
+     * @param buf    图片的字节数组
+     * @return 生成bitmap
+     */
+    public Bitmap createBitmap_from_rgb_alpha_data(int width, int height, byte[] buf) {
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        bitmap.setHasAlpha(false);
+        bitmap.setPixels(getIntArrayRGB(buf), 0, width, 0, 0, width, height);
         return bitmap;
     }
 
@@ -247,10 +368,24 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
      * @param b
      * @return
      */
-    public static int[] getIntArray(byte[] b) {
+    public static int[] getIntArrayMono(byte[] b) {
         int[] intArray = new int[b.length];
         for (int i = 0; i < intArray.length; i++) {
             intArray[i] = byteArrayToInt(b, i);
+        }
+        return intArray;
+    }
+
+    /**
+     * 将字节数组转成int数组
+     *
+     * @param b
+     * @return
+     */
+    public static int[] getIntArrayRGB(byte[] b) {
+        int[] intArray = new int[b.length/3];
+        for (int i = 0; i < intArray.length; i++) {
+            intArray[i] = rgbArrayToInt(b, 3*i);
         }
         return intArray;
     }
@@ -269,7 +404,22 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
         value += (int) (b[pos] << 16);
         value += (int) (255 << 24);
         return value;
+    }
 
+    /**
+     * byte装int
+     *
+     * @param b
+     * @param pos
+     * @return
+     */
+    public static int rgbArrayToInt(byte[] b, int pos) {
+        int value = 0;
+        value += (int) (b[pos]);
+        value += (int) (b[pos+1] << 8);
+        value += (int) (b[pos+2] << 16);
+        value += (int) (255 << 24);
+        return value;
     }
 
     private void requestPermission() {
@@ -337,10 +487,16 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        isStart = false;
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         handler.removeCallbacksAndMessages(null);
-        isStart = false;
+
     }
 
     /** 彩色相机用ImageView成像
@@ -387,4 +543,51 @@ public class ImageViewActivity extends AppCompatActivity implements View.OnClick
      return bmp;
      }
      */
+
+    public String upgradeRootPermission(String cmd) {
+        String result = "";
+        DataOutputStream dos = null;
+        DataInputStream dis = null;
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec("su");// 经过Root处理的android系统即有su命令
+            dos = new DataOutputStream(p.getOutputStream());
+            dis = new DataInputStream(p.getInputStream());
+            dos.writeBytes(cmd + "\n");//更改dev/bus/usb 权限为 777
+            dos.flush();
+            dos.writeBytes("setenforce 0" + "\n");
+            dos.flush();
+            dos.writeBytes("exit\n");
+            dos.flush();
+            String line = null;
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(dis));
+            while ((line = br.readLine()) != null) {
+                Log.d(TAG, "result:" + line);
+                result += line;
+            }
+            p.waitFor();
+        } catch (Exception e) {
+
+            e.printStackTrace();
+        } finally {
+            if (dos != null) {
+                try {
+                    dos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (dis != null) {
+                try {
+                    dis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            p.destroy();
+        }
+
+        return result;
+    }
 }
