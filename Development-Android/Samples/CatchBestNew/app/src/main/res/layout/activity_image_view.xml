@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:gmm="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:keepScreenOn="true"
+    android:orientation="horizontal"
+    android:id="@+id/container"
+    tools:context="com.catchebstnew.www.ImageViewActivity">
+
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:scrollbarThumbVertical="@android:color/transparent"
+        android:layout_width="120dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start|bottom">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/menu_bg">
+            <TextView
+                android:id="@+id/tv_device"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/menu_bg"
+                android:onClick="selectDevice"
+                android:text=""
+                android:textSize="14sp"
+                android:padding="5dp"
+                android:textColor="#333"/>
+
+            <LinearLayout
+                android:id="@+id/left_drawer"
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/tv_device">
+
+                <Button
+                    android:id="@+id/btn_back"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="back"
+                    android:text="返回"/>
+
+                <Button
+                    android:id="@+id/btn_catch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="catchBitmap"
+                    android:text="抓图"/>
+
+                <Button
+                    android:id="@+id/btn_white_balance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setWhiteBalance"
+                    android:text="白平衡"/>
+                <Button
+                    android:id="@+id/btn_gain"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setRbgGain"
+                    android:text="增益 "/>
+                <Button
+                    android:id="@+id/btn_bayer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setBayerMode"
+                    android:text="Bayer模式"/>
+                <Button
+                    android:id="@+id/btn_exposure"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setExposure"
+                    android:text="曝光"/>
+                <Button
+                    android:id="@+id/btn_trigger"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setTriggerModel"
+                    android:text="Trigger"/>
+                <Button
+                    android:id="@+id/btn_mirror"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setMirror"
+                    android:text="Mirror"/>
+                <Button
+                    android:id="@+id/btn_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setField"
+                    android:text="采集区域"/>
+                <Button
+                    android:id="@+id/btn_lut"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setLut"
+                    android:text="LUT"/>
+                <Button
+                    android:id="@+id/btn_sensitivity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setSensitivity"
+                    android:text="灵敏度"/>
+
+            </LinearLayout>
+
+
+            <android.support.v7.widget.RecyclerView
+                android:id="@+id/listView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/tv_device"
+                android:background="#fff"
+                android:visibility="gone"></android.support.v7.widget.RecyclerView>
+
+        </RelativeLayout>
+
+
+    </ScrollView>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:onClick="dismissDeviceListView">
+
+        <LinearLayout
+            android:id="@+id/imageViewContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+<!--            <ImageView-->
+<!--                android:id="@+id/imageView"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="match_parent"-->
+<!--                android:scaleType="centerCrop"-->
+<!--                />-->
+        </LinearLayout>
+
+
+        <TextView
+            android:id="@+id/tv_fps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:text="fps:0.0"
+            android:layout_marginRight="20dp"
+            android:layout_marginTop="40dp"
+            android:textSize="18sp"
+            android:textColor="#ff0000"/>
+
+        <TextView
+            android:id="@+id/tv_fail_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toLeftOf="@+id/tv_fps"
+            android:text=""
+            android:layout_marginRight="40dp"
+            android:layout_marginTop="40dp"
+            android:textSize="18sp"
+            android:textColor="#ff0000"/>
+
+
+
+    </RelativeLayout>
+
+</LinearLayout>
