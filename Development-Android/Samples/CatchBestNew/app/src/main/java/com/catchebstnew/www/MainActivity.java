@@ -11,6 +11,7 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import com.catchbest.R;
+import com.catchbest.cam;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -19,13 +20,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 
+
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     public static final String TAG = "MainActivity";
 
     private Button btnStart;
     private Button btnStart2;
     private Button btnRK3399;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,27 +43,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void init() {
-        if (!checkAccess()) {//判断Android设备是否支持访问dev/bus/usb 权限
-            if (checkSuFile()) {//针对手机和平板设备，判断系统是否root
-                upgradeRootPermission("chmod -R 777 /dev/bus/usb/");
-            } else {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("提示");
-                builder.setMessage("系统未root，功能不能使用");
-                builder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        finish();
-                    }
-                });
-
-                AlertDialog dialog = builder.create();
-                dialog.setCanceledOnTouchOutside(false);
-                dialog.show();
-            }
-        } else {
-            upgradeRootPermission("chmod -R 777 /dev/bus/usb/");
-        }
     }
 
     /**
@@ -174,7 +154,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             return false;
         }
     }
-
 
     @Override
     public void onClick(View v) {

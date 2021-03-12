@@ -79,7 +79,7 @@ public class SurfaceViewActivity extends AppCompatActivity implements SurfaceHol
      * 初始化cam，设置相机相关参数
      */
     private void init() {
-        ksjcam = new cam();
+        ksjcam = new cam(this);
         ksjcam.Init();
         ksjcam.m_devicecount = ksjcam.DeviceGetCount();
 

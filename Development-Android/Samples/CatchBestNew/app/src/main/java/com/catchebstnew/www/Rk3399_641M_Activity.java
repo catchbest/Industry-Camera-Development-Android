@@ -128,7 +128,7 @@ public class Rk3399_641M_Activity extends AppCompatActivity {
      * 初始化cam，设置相机参数，采图
      */
     private void init() {
-        ksjcam = new cam();
+        ksjcam = new cam(this);
         ksjcam.Init();
         ksjcam.m_devicecount = ksjcam.DeviceGetCount();
 

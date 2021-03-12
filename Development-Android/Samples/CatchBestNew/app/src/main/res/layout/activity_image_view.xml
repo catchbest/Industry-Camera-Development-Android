@@ -47,11 +47,18 @@
                     android:text="返回"/>
 
                 <Button
-                    android:id="@+id/btn_catch"
+                    android:id="@+id/btn_exposure"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:onClick="catchBitmap"
-                    android:text="抓图"/>
+                    android:onClick="setExposure"
+                    android:text="曝光"/>
+                <Button
+                    android:id="@+id/btn_gain"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="setRbgGain"
+                    android:text="增益 "/>
+
 
                 <Button
                     android:id="@+id/btn_white_balance"
@@ -59,24 +66,14 @@
                     android:layout_height="wrap_content"
                     android:onClick="setWhiteBalance"
                     android:text="白平衡"/>
-                <Button
-                    android:id="@+id/btn_gain"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:onClick="setRbgGain"
-                    android:text="增益 "/>
+
                 <Button
                     android:id="@+id/btn_bayer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:onClick="setBayerMode"
                     android:text="Bayer模式"/>
-                <Button
-                    android:id="@+id/btn_exposure"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:onClick="setExposure"
-                    android:text="曝光"/>
+
                 <Button
                     android:id="@+id/btn_trigger"
                     android:layout_width="match_parent"
@@ -107,6 +104,13 @@
                     android:layout_height="wrap_content"
                     android:onClick="setSensitivity"
                     android:text="灵敏度"/>
+
+                <Button
+                    android:id="@+id/btn_catch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="catchBitmap"
+                    android:text="抓图"/>
 
             </LinearLayout>
 

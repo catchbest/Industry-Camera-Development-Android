@@ -1,11 +1,13 @@
 package com.catchebstnew.www;
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -70,13 +72,14 @@ import static com.catchbest.KSJ_WB_MODE.KSJ_HWB_PRESETTINGS;
 import static com.catchbest.KSJ_WB_MODE.KSJ_SWB_AUTO_ONCE;
 
 public class ImageViewActivity extends AppCompatActivity implements
-         ExposurePopupwindow.ExposureChangeListener
+        ExposurePopupwindow.ExposureChangeListener
         , WhiteBalancePopupwindow.WhiteBalanceSelectListener
         , TriggerPopupwindow.TriggerModeListener
         , BayerModePopupwindow.BayerModeListener
         , GainPopupwindow.RedGainChangeListener
         , GainPopupwindow.GreenGainChangeListener
-        , GainPopupwindow.BlueGainChangeListener {
+        , GainPopupwindow.BlueGainChangeListener
+        , mvCameraCallback {
     private final int PERMISSION_REQUEST = 0xa00;
     private LinearLayout container;
     private LinearLayout imageViewContainer;
@@ -96,7 +99,6 @@ public class ImageViewActivity extends AppCompatActivity implements
     private int currentTrigger = KSJ_TRIGGRMODE.KSJ_TRIGGER_INTERNAL.ordinal();
     private int currentBayer = KSJ_BAYERMODE.KSJ_BGGR_BGR32_FLIP.ordinal();
 
-    private cam ksjcam;
     private boolean isStart = false;//相机开启状态
     private boolean isWorking = false;//相机工作状态
     private long startTime;
@@ -104,16 +106,18 @@ public class ImageViewActivity extends AppCompatActivity implements
     private int count = 0;
     private Lock lock;
 
-    private boolean isMirror = false;
-    private boolean isLut = true;
+    private boolean isLut = false;
     private int exposureLine = 200;
+    private int sensitivity = 0;
     private int redGain = 48;
     private int greenGain = 48;
     private int blueGain = 48;
 
-    private List<String> deviceArray =  new ArrayList<>();
+    private List<String> deviceArray = new ArrayList<>();
     private int curSelectCamera = 0;
     private int nextSelectCamera = 0;
+
+    private cam ksjcam = new cam(this);
 
     Handler handler = new Handler() {
         @Override
@@ -130,6 +134,7 @@ public class ImageViewActivity extends AppCompatActivity implements
                     } else {
                         currentTime = System.currentTimeMillis();
                     }
+                    //Log.e("TAG", "handleMessage: 显示图像" + count );
                     imageView.setImageBitmap((Bitmap) msg.obj);
                     count++;
                     break;
@@ -142,11 +147,11 @@ public class ImageViewActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_view);
 
-        container =  findViewById(R.id.container);
+        container = findViewById(R.id.container);
         imageViewContainer = findViewById(R.id.imageViewContainer);
 //        imageView = findViewById(R.id.imageView);
         imageView = new ImageView(this);
-        ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT);
+        ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         imageView.setLayoutParams(params);
         imageViewContainer.addView(imageView);
         tv_fps = findViewById(R.id.tv_fps);
@@ -154,7 +159,7 @@ public class ImageViewActivity extends AppCompatActivity implements
         tv_device_info = findViewById(R.id.tv_device);
         listView = findViewById(R.id.listView);
         listView.setLayoutManager(new LinearLayoutManager(this));
-        listView.addItemDecoration(new DividerItemDecoration(this,DividerItemDecoration.VERTICAL));
+        listView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
 
         gainPopup = new GainPopupwindow(this);
         exposurePopup = new ExposurePopupwindow(this);
@@ -169,30 +174,35 @@ public class ImageViewActivity extends AppCompatActivity implements
         triggerPopupwindow.setTriggerModeListener(this);
         bayerModePopupwindow.setBayerModeListener(this);
 
+        ksjcam.RealseAllDevices();
+        ksjcam.CameraEnumerateDeviceEx2(this);
+
         lock = new ReentrantLock();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+    }
+
+    public void onEnumerateDeviceCompleted(int nDev){
         init();
     }
 
     /**
      * 初始化cam，设置相机参数，采图
      */
-    private void init() {
-        ksjcam = new cam();
+    private void init(){
+        //int rr = ksjcam.EnableLog(1);
 
-        int rr = ksjcam.EnableLog(0);
+        //String logstr = "EnableLog：" + rr;
+        //Log.e("TAG", "info:" + logstr);//输出相机信息
 
-        String logstr = "EnableLog：" + rr;
-        Log.e("TAG","info:" + logstr);//输出相机信息
+        Runtime rt=Runtime.getRuntime();
+        long maxMemory=rt.maxMemory();
+        Log.e("TAG", "mem size:" + maxMemory/(1024*1024));
 
-        ksjcam.UnInit();
-        upgradeRootPermission("chmod -R 777 /dev/bus/usb/");  //相机重新插拔的话，需要授权
-        ksjcam.Init();
-        ksjcam.m_devicecount = ksjcam.DeviceGetCount();
+        Log.e("TAG", "==== ksjcam.m_devicecount = " + ksjcam.m_devicecount + "\n");
 
         if (ksjcam.m_devicecount <= 0) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -224,20 +234,24 @@ public class ImageViewActivity extends AppCompatActivity implements
                 Log.e("TAG", "====== 相机信息 ====== :\n" + content + "\n彩色相机");//输出相机信息
             }
 
+            int[] expArray = new int[1];
+            ksjcam.GetParam(0, KSJ_EXPOSURE.ordinal(), expArray);
+
             deviceArray.add(DeviceTypes[deviceTypeArray[0]] + "_" + serialsArray[0]);
 
             ksjcam.SetTriggerMode(i, KSJ_TRIGGER_INTERNAL.ordinal());//触发模式
             ksjcam.WhiteBalanceSet(i, KSJ_HWB_PRESETTINGS.ordinal());//白平衡
             ksjcam.SetParam(i, KSJ_EXPOSURE_LINES.ordinal(), exposureLine);//曝光
+            ksjcam.LutSetEnable(curSelectCamera, 0);//LUT 默认 1
             //ksjcam.SetParam(i, KSJ_RED.ordinal(), 16);
             //ksjcam.SetParam(i, KSJ_GREEN.ordinal(), 16);
             //ksjcam.SetParam(i, KSJ_BLUE.ordinal(), 16);
-            //ksjcam.SensitivitySetMode(0, KSJ_LOW.ordinal());//设置灵敏度
+            ksjcam.SensitivitySetMode(0, sensitivity);//设置灵敏度
         }
 
         tv_device_info.setText(deviceArray.get(0));
 
-        DeviceInfoAdapter adapter = new DeviceInfoAdapter(this,deviceArray);
+        DeviceInfoAdapter adapter = new DeviceInfoAdapter(this, deviceArray);
         listView.setAdapter(adapter);
         adapter.setOnItemClickListener(new DeviceInfoAdapter.OnItemClickListener() {
             @Override
@@ -258,7 +272,7 @@ public class ImageViewActivity extends AppCompatActivity implements
                 listView.setVisibility(View.GONE);
 
                 imageView = new ImageView(ImageViewActivity.this);
-                ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT);
+                ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
                 imageView.setLayoutParams(params);
                 imageViewContainer.addView(imageView);
                 isStart = true;
@@ -273,6 +287,7 @@ public class ImageViewActivity extends AppCompatActivity implements
         startTime = System.currentTimeMillis();
         startImageView();
     }
+
     /**
      * 黑白相机采图
      */
@@ -312,37 +327,57 @@ public class ImageViewActivity extends AppCompatActivity implements
         Thread captureThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                isWorking=true;
-                if(isBlackWhite != 0) {
+                isWorking = true;
+                if (isBlackWhite != 0) {
                     while (isStart) {
                         if (camIndex != nextSelectCamera) break;
                         lock.lock();
                         int ret = captureAndShow_Mono(camIndex, imgWidth, imgHeight);
                         if (ret == -1) {
-                            upgradeRootPermission("chmod -R 777 /dev/bus/usb/");  //相机重新插拔的话，需要授权
                             Log.e("TAG", "run: " + "一帧图片没取到");
                         }
                         lock.unlock();
                     }
-                }
-                else {
+                } else {
                     while (isStart) {
                         lock.lock();
                         int ret = captureAndShow_RGB(camIndex, imgWidth, imgHeight);
                         if (ret == -1) {
-                            upgradeRootPermission("chmod -R 777 /dev/bus/usb/");  //相机重新插拔的话，需要授权
                             Log.e("TAG", "run: " + "一帧图片没取到");
                         }
                         lock.unlock();
                     }
                 }
-                isWorking=false;
+                isWorking = false;
             }
         });
         captureThread.start();
     }
 
     int failCount = 0;
+
+    /**
+     * 按比例缩放图片
+     *
+     * @param origin 原图
+     * @param ratio  比例
+     * @return 新的bitmap
+     */
+    private Bitmap scaleBitmap(Bitmap origin, float ratio) {
+        if (origin == null) {
+            return null;
+        }
+        int width = origin.getWidth();
+        int height = origin.getHeight();
+        Matrix matrix = new Matrix();
+        matrix.preScale(ratio, ratio);
+        Bitmap newBM = Bitmap.createBitmap(origin, 0, 0, width, height, matrix, false);
+        if (newBM.equals(origin)) {
+            return newBM;
+        }
+        origin.recycle();
+        return newBM;
+    }
 
     /**
      * 采黑白图
@@ -353,9 +388,42 @@ public class ImageViewActivity extends AppCompatActivity implements
      * @return
      */
     public int captureAndShow_Mono(final int index, int width, int height) {
+        //displayBriefMemory();
+        /*
         byte[] byteArray = ksjcam.CaptureRAWdataArray(index, width, height);
-        if (byteArray != null && byteArray.length > 0) {
+        if (show != 0 && byteArray != null && byteArray.length > 0) {
+            //displayBriefMemory();
+            //Log.e("TAG", "采图大小: " + width + " " + height);
             Bitmap bitmap = createBitmap_from_byte_alpha_data(width, height, byteArray);
+            Message message = new Message();
+            message.what = 0;
+            message.arg1 = index;
+            message.obj = bitmap;
+            handler.sendMessage(message);
+        } else {
+            failCount++;
+            Log.e("TAG", "采图失败次数: " + failCount);
+            //runOnUiThread(new Runnable() {
+            //    @Override
+            //    public void run() {
+            //        tv_failCount.setText("采图失败次数：" + failCount);
+            //    }
+            //});
+            return -1;
+        }
+        */
+
+        int[] intArray = ksjcam.CaptureRAWImageArray(index, width, height);
+
+        if (intArray != null && intArray.length > 0) {
+            //displayBriefMemory();
+            //Log.e("TAG", "采图大小: " + width + " " + height);
+
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            bitmap.setHasAlpha(false);
+            bitmap.setPixels(intArray, 0, width, 0, 0, width, height);
+
+            //Bitmap bitmap = scaleBitmap(bitmap0, 0.5f);
             Message message = new Message();
             message.what = 0;
             message.arg1 = index;
@@ -387,11 +455,12 @@ public class ImageViewActivity extends AppCompatActivity implements
     public int captureAndShow_RGB(final int index, int width, int height) {
         byte[] byteArray = ksjcam.CaptureRGBdataArray(index, width, height);
         if (byteArray != null && byteArray.length > 0) {
+            Log.e("TAG", "采图大小: " + width + " " + height);
             Bitmap bitmap = createBitmap_from_rgb_alpha_data(width, height, byteArray);
             Message message = new Message();
             message.what = 0;
             message.arg1 = index;
-            message.obj = bitmap;
+            message.obj = bitmap;//bitmap;
             handler.sendMessage(message);
         } else {
             failCount++;
@@ -416,7 +485,7 @@ public class ImageViewActivity extends AppCompatActivity implements
      * @param buf    图片的字节数组
      * @return 生成bitmap
      */
-        public Bitmap createBitmap_from_byte_alpha_data(int width, int height, byte[] buf) {
+    public Bitmap createBitmap_from_byte_alpha_data(int width, int height, byte[] buf) {
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         bitmap.setHasAlpha(false);
         bitmap.setPixels(getIntArrayMono(buf, width, height), 0, width, 0, 0, width, height);
@@ -447,8 +516,9 @@ public class ImageViewActivity extends AppCompatActivity implements
     public static int[] getIntArrayMono(byte[] b, int width, int height) {
         int[] intArray = new int[b.length];
         for (int j = 0; j < height; j++) {
-            for (int i=0; i<width; ++i) {
-                intArray[((height-j-1)*width)+i] = byteArrayToInt(b, j*width+i);
+            for (int i = 0; i < width; ++i) {
+                //intArray[((height - j - 1) * width) + i] = byteArrayToInt(b, j * width + i);
+                intArray[j * width + i] = byteArrayToInt(b, j * width + i);
             }
         }
         return intArray;
@@ -461,10 +531,10 @@ public class ImageViewActivity extends AppCompatActivity implements
      * @return
      */
     public static int[] getIntArrayRGB(byte[] b, int width, int height) {
-        int[] intArray = new int[b.length/3];
+        int[] intArray = new int[b.length / 3];
         for (int j = 0; j < height; j++) {
-            for (int i=0; i<width; ++i) {
-                intArray[((height-j-1)*width)+i] = rgbArrayToInt(b, 3 * (j*width+i));
+            for (int i = 0; i < width; ++i) {
+                intArray[((height - j - 1) * width) + i] = rgbArrayToInt(b, 3 * (j * width + i));
             }
         }
         return intArray;
@@ -497,8 +567,8 @@ public class ImageViewActivity extends AppCompatActivity implements
     public static int rgbArrayToInt(byte[] b, int pos) {
         int value = 0;
         value += (int) (b[pos]);
-        value += (int) (b[pos+1] << 8);
-        value += (int) (b[pos+2] << 16);
+        value += (int) (b[pos + 1] << 8);
+        value += (int) (b[pos + 2] << 16);
         value += (int) (255 << 24);
         return value;
     }
@@ -651,7 +721,7 @@ public class ImageViewActivity extends AppCompatActivity implements
 
     @Override
     public void exposureChange(int progress) {
-        exposureLine =  progress;
+        exposureLine = progress;
         Log.e("TAG", "====== exposureLine ====== : " + exposureLine);
         ksjcam.SetParam(curSelectCamera, KSJ_EXPOSURE_LINES.ordinal(), exposureLine);
     }
@@ -725,7 +795,7 @@ public class ImageViewActivity extends AppCompatActivity implements
     public void setExposure(View view) {
         exposurePopup.setData(exposureLine);
         ksjcam.GetParamRange(curSelectCamera, KSJ_EXPOSURE_LINES.ordinal(), min, max);
-        if (max[0] > 999999) max[0]=65536;
+        if (max[0] > 999999) max[0] = 65536;
         exposurePopup.setRange(min[0], max[0]);
         exposurePopup.showPopupwindow(container);
     }
@@ -736,13 +806,27 @@ public class ImageViewActivity extends AppCompatActivity implements
     }
 
     public void setMirror(View view) {
-        if (!isMirror) {
-            ksjcam.SetParam(curSelectCamera, KSJ_MIRROR.ordinal(), 1);//镜像  默认0
-            isMirror = true;
-        } else {
-            ksjcam.SetParam(curSelectCamera, KSJ_MIRROR.ordinal(), 0);//镜像  默认0
-            isMirror = false;
+        isStart = false;
+        for (int i = 0; i < 20; ++i) { // 等待2秒钟，确认线程退出
+            if (!isWorking) break;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
+
+        int cur_value[] = new int[1];
+        ksjcam.GetParam(curSelectCamera, KSJ_MIRROR.ordinal(), cur_value);//镜像  默认0
+
+        if (cur_value[0] != 0) {
+            ksjcam.SetParam(curSelectCamera, KSJ_MIRROR.ordinal(), 0);//镜像  默认0
+        } else {
+            ksjcam.SetParam(curSelectCamera, KSJ_MIRROR.ordinal(), 1);//镜像  默认0
+        }
+
+        isStart = true;
+        startImageView();
     }
 
     public void setField(View view) {
@@ -775,7 +859,7 @@ public class ImageViewActivity extends AppCompatActivity implements
                     }
                 }
                 imageView = new ImageView(ImageViewActivity.this);
-                ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT);
+                ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
                 imageView.setLayoutParams(params);
                 imageViewContainer.addView(imageView);
                 ksjcam.CaptureSetFieldOfView(curSelectCamera, x, y, width, height);
@@ -787,6 +871,16 @@ public class ImageViewActivity extends AppCompatActivity implements
     }
 
     public void setLut(View view) {
+        isStart = false;
+        for (int i = 0; i < 20; ++i) { // 等待2秒钟，确认线程退出
+            if (!isWorking) break;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
         if (isLut) {
             ksjcam.LutSetEnable(curSelectCamera, 0);//LUT 默认 1
             isLut = false;
@@ -794,16 +888,32 @@ public class ImageViewActivity extends AppCompatActivity implements
             ksjcam.LutSetEnable(curSelectCamera, 1);//LUT 默认 1
             isLut = true;
         }
+
+        isStart = true;
+        startImageView();
     }
 
     public void setSensitivity(View view) {
-        int sensitivity = 0;
+        isStart = false;
+        for (int i = 0; i < 20; ++i) { // 等待2秒钟，确认线程退出
+            if (!isWorking) break;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
         if (sensitivity == 4) {
             sensitivity = 0;
         } else {
             sensitivity++;
         }
         ksjcam.SensitivitySetMode(curSelectCamera, sensitivity);
+        Log.e("TAG", "====== sensitivity ====== : " + sensitivity);
+
+        isStart = true;
+        startImageView();
     }
 
     public void selectDevice(View view) {
@@ -964,4 +1074,16 @@ public class ImageViewActivity extends AppCompatActivity implements
                     "UNKOWN TYPE",
                     "UNKOWN TYPE",
             };
+
+
+
+    private void displayBriefMemory() {
+        final ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
+        activityManager.getMemoryInfo(info);
+        Log.i("tag", "系统剩余内存:" + (info.availMem>> 10)+"k");
+        Log.i("tag", "系统是否处于低内存运行：" + info.lowMemory);
+        Log.i("tag", "当系统剩余内存低于" + info.threshold + "时就看成低内存运行");
+    }
 }
+
